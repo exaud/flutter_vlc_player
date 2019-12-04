@@ -69,6 +69,7 @@ class FlutterVideoView implements PlatformView, MethodChannel.MethodCallHandler,
                 url = methodCall.argument("url");
 
                 ArrayList<String> options = new ArrayList<>();
+                options.add("--rtsp-tcp");
 
                 LibVLC libVLC = new LibVLC(context, options);
                 Media media = new Media(libVLC, Uri.parse(Uri.decode(url)));
