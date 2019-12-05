@@ -31,16 +31,12 @@ class _MyAppState extends State<MyApp> {
         appBar: new AppBar(
           title: const Text('Plugin example app'),
         ),
-        floatingActionButton: FloatingActionButton(
-          child: Icon(Icons.camera),
-          onPressed: _createCameraImage,
-        ),
         body: Column(
           children: <Widget>[
             new VlcPlayer(
               defaultWidth: 640,
               defaultHeight: 360,
-              url: "http://213.226.254.135:91/mjpg/video.mjpg",
+              url: "rtsp://192.168.1.3:8086",
               controller: _videoViewController,
               placeholder: Container(
                 height: 250.0,
@@ -61,12 +57,5 @@ class _MyAppState extends State<MyApp> {
         ),
       ),
     );
-  }
-
-  void _createCameraImage() async {
-    Uint8List file = await _videoViewController.makeSnapshot();
-    setState(() {
-      image = file;
-    });
   }
 }

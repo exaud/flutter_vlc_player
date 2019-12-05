@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:cryptoutils/cryptoutils.dart';
 import 'package:flutter/services.dart';
 
 class VlcPlayerController {
@@ -17,13 +16,6 @@ class VlcPlayerController {
       'url': url,
     });
     return result['aspectRatio'];
-  }
-
-  Future<Uint8List> makeSnapshot() async {
-    var result = await _channel.invokeMethod("getSnapshot");
-    var base64String = result['snapshot'];
-    Uint8List imageBytes = CryptoUtils.base64StringToBytes(base64String);
-    return imageBytes;
   }
 
   void dispose() {

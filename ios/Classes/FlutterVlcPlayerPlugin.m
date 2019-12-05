@@ -81,21 +81,6 @@ UIView *_view;
         [_player play];
     } else if ([_methodName isEqualToString:@"dispose"]){
         [_player stop];
-    }else if ([_methodName isEqualToString:@"getSnapshot"]){
-        UIView *_drawable = _player.drawable;
-        CGSize _size = _drawable.frame.size;
-
-        UIGraphicsBeginImageContextWithOptions(_size, false, 0.0);
-
-        CGRect rec = _drawable.frame;
-        [_drawable drawViewHierarchyInRect:rec afterScreenUpdates:false];
-
-        UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
-        UIGraphicsEndImageContext();
-
-        NSString *_byteArray = [UIImagePNGRepresentation(image) base64EncodedStringWithOptions:NSDataBase64Encoding64CharacterLineLength];
-
-        result(@{@"snapshot" : _byteArray});
     }
 }
 

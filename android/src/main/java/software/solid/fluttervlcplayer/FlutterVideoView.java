@@ -2,11 +2,12 @@ package software.solid.fluttervlcplayer;
 
 import android.content.Context;
 import android.graphics.Bitmap;
-import android.graphics.SurfaceTexture;
 import android.net.Uri;
 import android.os.Build;
 import androidx.annotation.RequiresApi;
 import android.util.Base64;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
 import android.view.TextureView;
 import android.view.View;
 
@@ -30,7 +31,8 @@ class FlutterVideoView implements PlatformView, MethodChannel.MethodCallHandler,
     private final Context context;
 
     private MediaPlayer mediaPlayer;
-    private TextureView textureView;
+    private SurfaceView surfaceView;
+    private SurfaceHolder holder;
     private String url;
     private IVLCVout vout;
     private MethodChannel.Result result;
@@ -39,16 +41,16 @@ class FlutterVideoView implements PlatformView, MethodChannel.MethodCallHandler,
     @RequiresApi(api = Build.VERSION_CODES.O)
     public FlutterVideoView(Context context, BinaryMessenger messenger, int id) {
         this.context = context;
-        textureView = new TextureView(context);
-        SurfaceTexture texture = new SurfaceTexture(false);
-        textureView.setSurfaceTexture(texture);
+        surfaceView = new SurfaceView(context);
+        holder = surfaceView.getHolder();
+
         channel = new MethodChannel(messenger, "flutter_video_plugin/getVideoView_" + id);
         channel.setMethodCallHandler(this);
     }
 
     @Override
     public View getView() {
-        return textureView;
+        return surfaceView;
     }
 
     @Override
@@ -63,8 +65,9 @@ class FlutterVideoView implements PlatformView, MethodChannel.MethodCallHandler,
         switch (methodCall.method) {
             case "playVideo":
                 this.result = result;
-                if (textureView == null) {
-                    textureView = new TextureView(context);
+                if (surfaceView == null) {
+                    surfaceView = new SurfaceView(context);
+                    holder = surfaceView.getHolder();
                 }
                 url = methodCall.argument("url");
 
@@ -72,35 +75,23 @@ class FlutterVideoView implements PlatformView, MethodChannel.MethodCallHandler,
                 options.add("--avcodec-codec=h264");
 
                 LibVLC libVLC = new LibVLC(context, options);
+                holder.setKeepScreenOn(true);
+
                 Media media = new Media(libVLC, Uri.parse(Uri.decode(url)));
                 mediaPlayer = new MediaPlayer(media);
                 mediaPlayer.setVideoTrackEnabled(true);
                 vout = mediaPlayer.getVLCVout();
-                textureView.forceLayout();
-                textureView.setFitsSystemWindows(true);
-                vout.setVideoView(textureView);
-
+                surfaceView.forceLayout();
+                surfaceView.setFitsSystemWindows(true);
+                vout.setVideoView(surfaceView);
                 vout.attachViews();
+
                 mediaPlayer.setEventListener(this);
                 mediaPlayer.play();
                 break;
             case "dispose":
                 mediaPlayer.stop();
                 vout.detachViews();
-                break;
-            case "getSnapshot":
-                String imageBytes;
-                Map<String, String> response = new HashMap<>();
-                if (mediaPlayer.isPlaying()) {
-                    Bitmap bitmap = textureView.getBitmap();
-                    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream);
-                    imageBytes = Base64.encodeToString(outputStream.toByteArray(), Base64.DEFAULT);
-                    response.put("snapshot", imageBytes);
-                    textureView.setDrawingCacheEnabled(false);
-                    textureView.destroyDrawingCache();
-                }
-                result.success(response);
                 break;
             case "onTap":
                 if (mediaPlayer.isPlaying()) {
@@ -132,7 +123,7 @@ class FlutterVideoView implements PlatformView, MethodChannel.MethodCallHandler,
                     resultMap.put("aspectRatio", aspectRatio);
                 }
 
-                vout.setWindowSize(textureView.getWidth(), textureView.getHeight());
+                vout.setWindowSize(surfaceView.getWidth(), surfaceView.getHeight());
                 if (!replyAlreadySubmitted) {
                     result.success(resultMap);
                     replyAlreadySubmitted = true;
