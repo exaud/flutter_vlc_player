@@ -68,12 +68,12 @@ class FlutterVideoView implements PlatformView, MethodChannel.MethodCallHandler,
                 }
                 url = methodCall.argument("url");
 
-                ArrayList<String> options = new ArrayList<>();
-                options.add("--rtsp-tcp");
+                ArrayList<String> options = new ArrayList<String>();
+                options.add("--avcodec-codec=h264");
 
                 LibVLC libVLC = new LibVLC(context, options);
                 Media media = new Media(libVLC, Uri.parse(Uri.decode(url)));
-                mediaPlayer = new MediaPlayer(libVLC);
+                mediaPlayer = new MediaPlayer(media);
                 mediaPlayer.setVideoTrackEnabled(true);
                 vout = mediaPlayer.getVLCVout();
                 textureView.forceLayout();
@@ -81,7 +81,6 @@ class FlutterVideoView implements PlatformView, MethodChannel.MethodCallHandler,
                 vout.setVideoView(textureView);
 
                 vout.attachViews();
-                mediaPlayer.setMedia(media);
                 mediaPlayer.setEventListener(this);
                 mediaPlayer.play();
                 break;
