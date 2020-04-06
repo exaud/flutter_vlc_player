@@ -1,22 +1,22 @@
 package software.solid.fluttervlcplayer;
 
 import android.content.Context;
-import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Build;
-import androidx.annotation.RequiresApi;
-import android.util.Base64;
+import android.os.Handler;
+import android.os.HandlerThread;
+import android.os.Looper;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
-import android.view.TextureView;
 import android.view.View;
+
+import androidx.annotation.RequiresApi;
 
 import org.videolan.libvlc.IVLCVout;
 import org.videolan.libvlc.LibVLC;
 import org.videolan.libvlc.Media;
 import org.videolan.libvlc.MediaPlayer;
 
-import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -27,6 +27,8 @@ import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.platform.PlatformView;
 
 class FlutterVideoView implements PlatformView, MethodChannel.MethodCallHandler, MediaPlayer.EventListener {
+    private static final String TAG = FlutterVideoView.class.getSimpleName();
+
     private final MethodChannel channel;
     private final Context context;
 
@@ -38,9 +40,19 @@ class FlutterVideoView implements PlatformView, MethodChannel.MethodCallHandler,
     private MethodChannel.Result result;
     private boolean replyAlreadySubmitted = false;
 
+    private final Handler mTasksHandler;
+    private final Handler mMainHandler;
+
     @RequiresApi(api = Build.VERSION_CODES.O)
     public FlutterVideoView(Context context, BinaryMessenger messenger, int id) {
         this.context = context;
+
+        HandlerThread tasksHandlerThread = new HandlerThread("BackgroundTasks");
+        tasksHandlerThread.setPriority(Thread.NORM_PRIORITY);
+        tasksHandlerThread.start();
+        mTasksHandler = new Handler(tasksHandlerThread.getLooper());
+        mMainHandler = new Handler(Looper.getMainLooper());
+
         surfaceView = new SurfaceView(context);
         holder = surfaceView.getHolder();
 
@@ -55,43 +67,19 @@ class FlutterVideoView implements PlatformView, MethodChannel.MethodCallHandler,
 
     @Override
     public void dispose() {
-        mediaPlayer.stop();
-        vout.detachViews();
+        stopStream();
     }
-
 
     @Override
     public void onMethodCall(MethodCall methodCall, MethodChannel.Result result) {
         switch (methodCall.method) {
             case "playVideo":
                 this.result = result;
-                if (surfaceView == null) {
-                    surfaceView = new SurfaceView(context);
-                    holder = surfaceView.getHolder();
-                }
                 url = methodCall.argument("url");
-
-                ArrayList<String> options = new ArrayList<String>();
-                options.add("--avcodec-codec=h264");
-
-                LibVLC libVLC = new LibVLC(context, options);
-                holder.setKeepScreenOn(true);
-
-                Media media = new Media(libVLC, Uri.parse(Uri.decode(url)));
-                mediaPlayer = new MediaPlayer(media);
-                mediaPlayer.setVideoTrackEnabled(true);
-                vout = mediaPlayer.getVLCVout();
-                surfaceView.forceLayout();
-                surfaceView.setFitsSystemWindows(true);
-                vout.setVideoView(surfaceView);
-                vout.attachViews();
-
-                mediaPlayer.setEventListener(this);
-                mediaPlayer.play();
+                startStream();
                 break;
             case "dispose":
-                mediaPlayer.stop();
-                vout.detachViews();
+                stopStream();
                 break;
             case "onTap":
                 if (mediaPlayer.isPlaying()) {
@@ -124,11 +112,78 @@ class FlutterVideoView implements PlatformView, MethodChannel.MethodCallHandler,
                 }
 
                 vout.setWindowSize(surfaceView.getWidth(), surfaceView.getHeight());
-                if (!replyAlreadySubmitted) {
+
+                if (result != null && !replyAlreadySubmitted) {
                     result.success(resultMap);
                     replyAlreadySubmitted = true;
                 }
                 break;
         }
+    }
+
+    private void startStream() {
+        if (url != null) {
+            mTasksHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        if (surfaceView == null) {
+                            surfaceView = new SurfaceView(context);
+                            holder = surfaceView.getHolder();
+                        }
+
+                        surfaceView.setFitsSystemWindows(true);
+                        holder.setKeepScreenOn(true);
+
+                        ArrayList<String> options = new ArrayList<String>();
+                        options.add("--avcodec-codec=h264");
+                        LibVLC libVLC = new LibVLC(context, options);
+                        Media media = new Media(libVLC, Uri.parse(Uri.decode(url)));
+                        mediaPlayer = new MediaPlayer(media);
+                        mediaPlayer.setVideoTrackEnabled(true);
+                        vout = mediaPlayer.getVLCVout();
+
+                        mMainHandler.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                try {
+                                    surfaceView.forceLayout();
+                                    vout.setVideoView(surfaceView);
+                                    vout.attachViews();
+                                    mediaPlayer.setEventListener(FlutterVideoView.this);
+                                    mediaPlayer.play();
+                                } catch (Exception e) {
+                                }
+                            }
+                        });
+                    } catch (Exception e) {
+                    }
+                }
+            });
+        }
+    }
+
+    private void stopStream() {
+        mTasksHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    result = null;
+                    replyAlreadySubmitted = false;
+                    mediaPlayer.stop();
+                } catch (Exception e) {
+                }
+            }
+        });
+
+        mMainHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    vout.detachViews();
+                } catch (Exception e) {
+                }
+            }
+        });
     }
 }
