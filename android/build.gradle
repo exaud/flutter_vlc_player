@@ -41,7 +41,9 @@ android {
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
-    implementation 'org.videolan.android:libvlc-all:3.2.2'
+    // IMPORTANT: version 3.2.* cause to ANR after first connect to RTPS stream
+    // https://code.videolan.org/videolan/vlc-android/issues/172
+    implementation 'org.videolan.android:libvlc-all:3.3.0-eap07'
     implementation 'androidx.appcompat:appcompat:1.0.2'
     implementation 'androidx.legacy:legacy-support-v4:1.0.0'
     implementation 'androidx.annotation:annotation:1.0.2'
